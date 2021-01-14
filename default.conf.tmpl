@@ -1,0 +1,57 @@
+server {
+	listen 80;
+	listen [::]:80;
+	server_name _;
+ 	if ( $http_x_forwarded_proto != 'https' ) {
+		return 301 https://$host$request_uri;
+	}
+}
+
+server {
+	listen 443 ssl ;
+	listen [::]:443 ssl;
+
+	server_name _;
+	root /var/www/html;
+
+	access_log /var/log/nginx/server_access.log;
+	error_log /var/log/nginx/server_error.log;
+
+	ssl on;
+	ssl_certificate /etc/nginx/server.crt;
+	ssl_certificate_key /etc/nginx/server.key;
+
+	location / {
+		try_files $uri $uri/ /wordpress;
+		autoindex {{ var "AUTOINDEX" | default "on" }};
+		location ~ \.php$ {
+			try_files $uri /wordpress;
+			include /etc/nginx/fastcgi_params;
+			fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+			fastcgi_pass unix:/run/php/php7.3-fpm.sock;
+		}
+	}
+
+	location /wordpress {
+		try_files $uri $uri/ /wordpress;
+		index index.php;
+		location ~ \.php$ {
+			try_files $uri /wordpress;
+			include /etc/nginx/fastcgi_params;
+			fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+			fastcgi_pass unix:/run/php/php7.3-fpm.sock;
+		}
+	}
+
+	location /phpmyadmin {
+		try_files $uri $uri/ /phpmyadmin;
+		index index.php;
+		location ~ \.php$ {
+			try_files $uri /phpmyadmin;
+			include /etc/nginx/fastcgi_params;
+			fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+			fastcgi_pass unix:/run/php/php7.3-fpm.sock;
+		}
+	}
+}
+
