@@ -2,7 +2,8 @@ FROM	debian:buster
 
 RUN		set -ex; \
 		apt-get update; \
-		apt-get -y install wget vim unzip openssl \
+		apt-get -y install \
+			wget vim unzip openssl \
 			nginx \
 			mariadb-server mariadb-client \
 			php-cgi php-common php-fpm php-pear php-mbstring php-zip \
@@ -13,9 +14,8 @@ WORKDIR	/var/www/html/
 RUN		set -ex; \
 		wget https://wordpress.org/latest.tar.gz; \
 		tar -xvzf latest.tar.gz; \
-		rm latest.tar.gz
-COPY	./wp-config.php /var/www/html/wordpress/
-RUN		chown -R www-data:www-data /var/www/html/wordpress
+		rm latest.tar.gz; \
+		chown -R www-data:www-data /var/www/html/wordpress
 
 RUN		set -ex; \
 		wget https://files.phpmyadmin.net/phpMyAdmin/5.0.4/phpMyAdmin-5.0.4-all-languages.zip; \
@@ -25,7 +25,6 @@ RUN		set -ex; \
 
 WORKDIR	/
 RUN		set -ex; \
-		rm -rf /var/cache/apk/*; \
 		wget https://github.com/progrium/entrykit/releases/download/v0.4.0/entrykit_0.4.0_Linux_x86_64.tgz; \
 		tar -xvzf entrykit_0.4.0_Linux_x86_64.tgz; \
 		rm entrykit_0.4.0_Linux_x86_64.tgz; \
@@ -33,11 +32,31 @@ RUN		set -ex; \
 		chmod +x /bin/entrykit; \
 		entrykit --symlink
 
-COPY	./default.conf.tmpl /etc/nginx/sites-available/
-RUN		set -ex; \
-		ln -s /etc/nginx/sites-available/default.conf /etc/nginx/sites-enabled/; \
-		rm /etc/nginx/sites-enabled/default
+WORKDIR /etc/nginx
+RUN		openssl req -newkey rsa:4096 \
+			-x509 \
+			-sha256 \
+			-days 3650 \
+			-nodes \
+			-out server.crt \
+			-keyout server.key \
+			-subj "/C=JP/ST=Tokyo/L=Minato-ku/O=42Tokyo/OU=August/CN=example.com"
 
-COPY	./entrypoint.sh /usr/bin/
-RUN		chmod +x /usr/bin/entrypoint.sh
+WORKDIR	/
+RUN		set -ex; \
+		service mysql start; \
+		echo "CREATE DATABASE wpdb;" | mysql -u root; \
+		echo "CREATE USER 'wpuser'@'localhost' identified by 'dbpassword';" | mysql -u root; \
+		echo "GRANT ALL PRIVILEGES ON wpdb.* TO 'wpuser'@'localhost';" | mysql -u root; \
+		echo "FLUSH PRIVILEGES;" | mysql -u root
+
+COPY	./srcs/default.conf.tmpl /etc/nginx/sites-available/
+COPY	./srcs/wp-config.php /var/www/html/wordpress/
+COPY	./srcs/entrypoint.sh /usr/bin/
+RUN		set -ex; \
+		chmod +r /etc/nginx/sites-available/default.conf.tmpl; \
+		chmod +r /var/www/html/wordpress/wp-config.php; \
+		chmod +x /usr/bin/entrypoint.sh; \
+		ln -s /etc/nginx/sites-available/default.conf /etc/nginx/sites-enabled/
+
 ENTRYPOINT	["render", "/etc/nginx/sites-available/default.conf", "--", "/usr/bin/entrypoint.sh"]
