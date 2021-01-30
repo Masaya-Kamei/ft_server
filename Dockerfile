@@ -57,6 +57,7 @@ RUN		set -ex; \
 		chmod +r /etc/nginx/sites-available/default.conf.tmpl; \
 		chmod +r /var/www/html/wordpress/wp-config.php; \
 		chmod +x /usr/bin/entrypoint.sh; \
-		ln -s /etc/nginx/sites-available/default.conf /etc/nginx/sites-enabled/
+		ln -s /etc/nginx/sites-available/default.conf /etc/nginx/sites-enabled/; \
+		rm /etc/nginx/sites-enabled/default
 
 ENTRYPOINT	["render", "/etc/nginx/sites-available/default.conf", "--", "/usr/bin/entrypoint.sh"]
